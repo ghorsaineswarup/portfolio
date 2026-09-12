@@ -1,0 +1,13 @@
+# Dependencies and generated builds
+node_modules/
+dist/
+.vite/
+
+# Local environment secrets
+.env
+.env.*
+!.env.example
+
+# System and editor files
+.DS_Store
+.vscode/
