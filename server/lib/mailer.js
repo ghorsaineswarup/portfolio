@@ -12,6 +12,7 @@ function getTransporter() {
     port: Number(SMTP_PORT) || 587,
     secure: Number(SMTP_PORT) === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    family: 4, // force IPv4 — some hosts (like Render) can't route to Gmail's IPv6 address
   });
   return transporter;
 }
