@@ -1,54 +1,35 @@
-import nodemailer from 'nodemailer';
-import dns from 'node:dns';
+import { Resend } from 'resend';
 
-let transporter = null;
+let resendClient = null;
 
-async function resolveIPv4(hostname) {
-  return new Promise((resolve, reject) => {
-    dns.lookup(hostname, { family: 4 }, (err, address) => {
-      if (err) reject(err);
-      else resolve(address);
-    });
-  });
-}
-
-async function getTransporter() {
-  if (transporter) return transporter;
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
-
-  // Resolve to an IPv4 address explicitly — some hosts (like Render) can't
-  // route to Gmail's IPv6 address, so we connect to the IPv4 IP directly
-  // while keeping the original hostname for TLS certificate validation.
-  const ipv4Address = await resolveIPv4(SMTP_HOST);
-
-  transporter = nodemailer.createTransport({
-    host: ipv4Address,
-    port: Number(SMTP_PORT) || 587,
-    secure: Number(SMTP_PORT) === 465,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-    tls: {
-      servername: SMTP_HOST, // preserves correct SNI/cert matching for the real hostname
-    },
-  });
-  return transporter;
+function getClient() {
+  if (resendClient) return resendClient;
+  if (!process.env.RESEND_API_KEY) return null;
+  resendClient = new Resend(process.env.RESEND_API_KEY);
+  return resendClient;
 }
 
 export async function sendContactEmail({ name, email, message }) {
-  const t = await getTransporter();
-  if (!t) {
-    console.log('Email skipped: SMTP env vars not set.');
+  const client = getClient();
+  if (!client) {
+    console.log('Email skipped: RESEND_API_KEY not set.');
     return;
   }
 
-  const to = process.env.CONTACT_TO_EMAIL || process.env.SMTP_USER;
+  const to = process.env.CONTACT_TO_EMAIL;
   console.log(`Attempting to send contact email to ${to}...`);
-  const info = await t.sendMail({
-    from: process.env.SMTP_USER,
+
+  const { data, error } = await client.emails.send({
+    from: 'Portfolio Contact Form <onboarding@resend.dev>',
     to,
     replyTo: email,
     subject: `New contact form message from ${name}`,
     text: `From: ${name} <${email}>\n\n${message}`,
   });
-  console.log('Email sent successfully:', info.messageId);
+
+  if (error) {
+    console.error('Failed to send contact email notification:', error.message || error);
+    return;
+  }
+  console.log('Email sent successfully:', data.id);
 }
