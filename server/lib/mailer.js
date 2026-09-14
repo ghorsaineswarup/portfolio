@@ -16,18 +16,21 @@ function getTransporter() {
   return transporter;
 }
 
-// No-ops silently if SMTP_* env vars aren't set. The message is still
-// saved to the database regardless — this is just a "nice to be notified" extra.
 export async function sendContactEmail({ name, email, message }) {
   const t = getTransporter();
-  if (!t) return;
+  if (!t) {
+    console.log('Email skipped: SMTP env vars not set.');
+    return;
+  }
 
   const to = process.env.CONTACT_TO_EMAIL || process.env.SMTP_USER;
-  await t.sendMail({
+  console.log(`Attempting to send contact email to ${to}...`);
+  const info = await t.sendMail({
     from: process.env.SMTP_USER,
     to,
     replyTo: email,
     subject: `New contact form message from ${name}`,
     text: `From: ${name} <${email}>\n\n${message}`,
   });
+  console.log('Email sent successfully:', info.messageId);
 }
